@@ -210,7 +210,6 @@
     .tx-item:last-child { border-bottom: none; }
     .tx-main { flex: 1; min-width: 0; padding-right: 8px; }
     .tx-top { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 0.76rem; color: var(--sub); }
-    /* 大カテゴリと小カテゴリの色を逆転：大＝オレンジ系、小＝グレー系 */
     .tx-badge { background: #fff7ed; color: #c2410c; padding: 2px 7px; border-radius: 6px; font-weight: 600; }
     .tx-sub-badge { background: #f1f5f9; color: var(--text); padding: 2px 6px; border-radius: 6px; font-weight: 600; }
     .tx-memo { font-size: 0.92rem; font-weight: 600; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -527,10 +526,13 @@
   const DEFAULT_CATEGORY_TREE = {
     expense: [
       { major: '食費', subs: ['食料品', '外食', '朝ご飯', '昼ご飯', '夜ご飯', 'カフェ', 'その他食費'] },
-      { major: '日用品', subs: ['子育て用品', 'ドラッグストア', 'おこづかい', 'ペット用品', 'タバコ', 'その他日用品'] },
-      { major: '趣味・娯楽', subs: ['アウトドア', 'ゴルフ', 'スポーツ', '映画・音楽・ゲーム', '本', '旅行', '秘密の趣味', 'その他趣味・娯楽'] },
-      { major: '健康・医療', subs: ['フィットネス', 'ボディケア', '医療費', '薬', 'その他健康・医療'] },
-      { major: '衣類・美容', subs: ['クリーニング', '美容院・理髪', '化粧品', 'アクセサリ', 'その他衣服・美容'] },
+      { major: '日用品', subs: ['日用品', '子育て用品', 'ドラッグストア', 'おこづかい', 'ペット用品', 'タバコ', 'その他日用品'] },
+      { major: '趣味・娯楽', subs: ['フットサル', 'フットサル用品', 'スポーツ', 'ゲーム', '本', '旅行', '秘密の趣味', 'その他趣味・娯楽'] },
+      { major: '健康', subs: ['サプリメント', 'プロテイン', 'ジム', 'その他健康'] },
+      { major: '医療', subs: ['医療費', '歯医者', '薬', 'その他医療'] },
+      { major: '衣類', subs: ['衣服', '靴', 'アクセサリー', 'その他衣類'] },
+      { major: '美容', subs: ['理髪・美容院', '化粧品', 'その他美容'] },
+      { major: 'ＡＩ', subs: ['テキスト生成ＡＩ', '動画生成ＡＩ', '画像生成ＡＩ', '会話型生成ＡＩ', 'その他生成ＡＩ'] },
       { major: '特別な支出', subs: ['家具・家電', '住宅・リフォーム', 'その他特別な支出'] },
       { major: '交通費', subs: ['電車', 'バス', 'タクシー', '飛行機', 'その他交通費'] },
       { major: '通信費', subs: ['携帯電話', '固定電話', 'インターネット', '放送視聴料', '情報サービス', '宅配便・運送', 'その他通信費'] },
@@ -538,7 +540,6 @@
       { major: '交際費', subs: ['飲み会', 'プレゼント代', '冠婚葬祭', 'その他交際費'] },
       { major: '自動車', subs: ['自動車ローン', '道路料金', 'ガソリン', '駐車場', '車両', '車検・整備', '自動車保険', 'その他自動車'] },
       { major: '教養・教育', subs: ['書籍', '新聞・雑誌', '習いごと', '学費', '塾', 'その他教養・教育'] },
-      { major: '現金・カード', subs: ['ATM引き出し', 'カード引き落とし', '電子マネー', '使途不明金', 'その他現金・カード'] },
       { major: '水道・光熱費', subs: ['光熱費', '電気代', 'ガス・灯油代', '水道代', 'その他水道・光熱費'] },
       { major: '住宅', subs: ['家賃・地代', 'ローン返済', '管理費・積立金', '地震・火災保険', 'その他住宅'] },
       { major: '税・社会保障', subs: ['所得税・住民税', '年金保険料', '健康保険', 'その他税・社会保障'] },
@@ -727,7 +728,7 @@
       { id: 'd1', date: `${ym}-02`, type: 'income', category: '給与', subCategory: '残業代・手当', amount: 280000, method: '銀行口座', memo: '給与振込', isCalc: 1 },
       { id: 'd2', date: `${ym}-05`, type: 'expense', category: '食費', subCategory: '食料品', amount: 4200, method: 'クレジットカード', memo: 'スーパー買い物', isCalc: 1 },
       { id: 'd3', date: `${ym}-05`, type: 'expense', category: '食費', subCategory: 'カフェ', amount: 650, method: 'QR・電子マネー', memo: 'コーヒー', isCalc: 1 },
-      { id: 'd4', date: `${ym}-08`, type: 'expense', category: '趣味・娯楽', subCategory: 'スポーツ', amount: 3500, method: 'QR・電子マネー', memo: 'フットサル', isCalc: 1 },
+      { id: 'd4', date: `${ym}-08`, type: 'expense', category: '趣味・娯楽', subCategory: 'フットサル', amount: 3500, method: 'QR・電子マネー', memo: 'フットサル', isCalc: 1 },
       { id: 'd5', date: `${ym}-12`, type: 'expense', category: '日用品', subCategory: 'ドラッグストア', amount: 1850, method: 'QR・電子マネー', memo: '洗剤・ティッシュ', isCalc: 1 }
     ];
   }
@@ -979,7 +980,6 @@
           ok = data && data.status === 'ok';
         } catch (e) {}
 
-        // GAS側がupdate未対応の場合はdelete + addで確実に上書き
         if (!ok) {
           await fetch(state.gasUrl, {
             method: 'POST',
@@ -1460,7 +1460,6 @@
 
     grouped.forEach((items, dateStr) => {
       const ym = dateStr.slice(0, 7);
-      // 最新月（先頭）も含め、月が変わるたびに区切り線を表示
       if (ym !== prevYM) {
         html += `
           <div class="month-divider">
