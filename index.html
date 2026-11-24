@@ -592,6 +592,18 @@
   const MAX_CATEGORY_HISTORY = 5;
   const MONTHS_PER_PAGE = 12;
 
+  function getTodayLocalStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function getCurrentLocalYM() {
+    return getTodayLocalStr().slice(0, 7);
+  }
+
   const pieCategoryLabelPlugin = {
     id: 'pieCategoryLabelPlugin',
     afterDatasetsDraw(chart) {
@@ -643,7 +655,7 @@
 
   let state = {
     gasUrl: localStorage.getItem('kakeibo_gas_url') || '',
-    currentYM: new Date().toISOString().slice(0, 7),
+    currentYM: getCurrentLocalYM(),
     listYearOffset: 0,
     selectedListCategory: '',
     txType: 'expense',
@@ -672,8 +684,13 @@
   let pieChartInstance = null;
   let barChartInstance = null;
 
+  function setInputDateToToday() {
+    const el = document.getElementById('inDate');
+    if (el) el.value = getTodayLocalStr();
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('inDate').value = new Date().toISOString().slice(0, 10);
+    setInputDateToToday();
     document.getElementById('gasUrlInput').value = state.gasUrl;
     document.getElementById('budgetInput').value = state.monthlyBudget;
     ensureValidSelection();
@@ -780,6 +797,7 @@
       renderList();
     }
     if (name === 'input') {
+      setInputDateToToday();
       ensureValidSelection();
       renderCategoryHistory();
       renderCategoryChips();
