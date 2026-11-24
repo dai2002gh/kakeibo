@@ -1,6 +1,6 @@
 {
   "name": "MY家計簿",
-  "short_name": "家計簿",
+  "short_name": "MY家計簿",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
