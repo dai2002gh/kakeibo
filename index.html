@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MY会計簿">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#ff7a00">
-  <title>シンプル家計簿</title>
+  <meta name="theme-color" content="#FDCB9E">
+  <title>MY会計簿</title>
+  <link rel="manifest" href="./manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -174,6 +176,9 @@
       margin: 22px 0 12px;
       font-size: 0.84rem; font-weight: 700; color: var(--primary);
     }
+    .month-divider:first-child {
+      margin-top: 4px;
+    }
     .month-divider::before,
     .month-divider::after {
       content: "";
@@ -203,15 +208,40 @@
       padding: 10px 4px; border-bottom: 1px solid #f1f5f9;
     }
     .tx-item:last-child { border-bottom: none; }
-    .tx-main { flex: 1; min-width: 0; padding-right: 10px; }
+    .tx-main { flex: 1; min-width: 0; padding-right: 8px; }
     .tx-top { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 0.76rem; color: var(--sub); }
-    .tx-badge { background: #f1f5f9; padding: 2px 7px; border-radius: 6px; font-weight: 600; color: var(--text); }
-    .tx-sub-badge { background: #fff7ed; color: #c2410c; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+    /* 大カテゴリと小カテゴリの色を逆転：大＝オレンジ系、小＝グレー系 */
+    .tx-badge { background: #fff7ed; color: #c2410c; padding: 2px 7px; border-radius: 6px; font-weight: 600; }
+    .tx-sub-badge { background: #f1f5f9; color: var(--text); padding: 2px 6px; border-radius: 6px; font-weight: 600; }
     .tx-memo { font-size: 0.92rem; font-weight: 600; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tx-right { text-align: right; display: flex; align-items: center; gap: 10px; }
-    .tx-amount { font-weight: 700; font-size: 0.98rem; }
+    .tx-right { text-align: right; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .tx-amount { font-weight: 700; font-size: 0.98rem; margin-right: 2px; }
+    .edit-btn {
+      border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c;
+      font-size: 0.74rem; font-weight: 700; cursor: pointer;
+      padding: 3px 7px; border-radius: 6px;
+    }
+    .edit-btn:hover { background: #ffedd5; }
     .del-btn { border: none; background: none; color: #cbd5e1; font-size: 1.1rem; cursor: pointer; padding: 4px; }
     .del-btn:hover { color: var(--expense); }
+
+    /* 編集モーダル */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5);
+      display: none; align-items: center; justify-content: center;
+      padding: 14px; z-index: 60; overflow-y: auto;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: #fff; width: 100%; max-width: 520px; border-radius: 16px;
+      padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      max-height: 92vh; overflow-y: auto;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; font-weight: 700; font-size: 1rem;
+    }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 
     .year-pager {
       display: flex; justify-content: space-between; align-items: center;
@@ -242,11 +272,9 @@
     .toast {
       position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
       background: #1e293b; color: #fff; padding: 9px 18px; border-radius: 99px;
-      font-size: 0.85rem; z-index: 50; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      font-size: 0.85rem; z-index: 70; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
   </style>
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#FDCB9E">
 </head>
 <body>
 
@@ -431,6 +459,63 @@
   </div>
 </div>
 
+<!-- 明細編集モーダル -->
+<div class="modal-backdrop" id="editModal" onclick="if(event.target===this) closeEditModal()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span>明細を修正</span>
+      <button type="button" class="btn-sm-del" onclick="closeEditModal()" style="font-size:1.1rem;">×</button>
+    </div>
+
+    <div class="type-tabs" style="margin-bottom:10px;">
+      <button type="button" class="type-btn" data-edit-type="expense" onclick="setEditTxType('expense')">支出</button>
+      <button type="button" class="type-btn" data-edit-type="income" onclick="setEditTxType('income')">収入</button>
+      <button type="button" class="type-btn" data-edit-type="transfer" onclick="setEditTxType('transfer')">振替</button>
+    </div>
+
+    <div class="form-group">
+      <label>金額（円）</label>
+      <input type="number" id="editAmount" class="form-control amount-input" inputmode="numeric">
+    </div>
+
+    <div class="form-group">
+      <label>大カテゴリ</label>
+      <div class="cat-chips" id="editMajorCategoryChips"></div>
+    </div>
+
+    <div class="form-group">
+      <label>小カテゴリ（任意）</label>
+      <div class="cat-chips" id="editSubCategoryChips"></div>
+    </div>
+
+    <div class="form-group" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <div>
+        <label>日付</label>
+        <input type="date" id="editDate" class="form-control">
+      </div>
+      <div>
+        <label>支払方法・口座</label>
+        <select id="editMethod" class="form-control">
+          <option value="現金">現金</option>
+          <option value="クレジットカード">クレジットカード</option>
+          <option value="QR・電子マネー">QR・電子マネー</option>
+          <option value="銀行口座">銀行口座</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>内容・メモ</label>
+      <input type="text" id="editMemo" class="form-control" placeholder="例：スーパー買い物、ランチなど">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-outline" onclick="closeEditModal()">キャンセル</button>
+      <button type="button" class="btn-primary" id="editSaveBtn" onclick="saveEditedTransaction()" style="padding:10px;">変更を保存</button>
+    </div>
+  </div>
+</div>
+
 <nav class="bottom-nav">
   <button class="nav-btn active" data-view="home" onclick="switchView('home', this)"><span class="nav-icon">📊</span>ホーム</button>
   <button class="nav-btn" data-view="input" onclick="switchView('input', this)"><span class="nav-icon">✏️</span>入力</button>
@@ -543,7 +628,11 @@
     categoryTree: loadLocalCategories(),
     categoryHistory: loadCategoryHistory(),
     transactions: [],
-    parsedCsvItems: []
+    parsedCsvItems: [],
+    editingTxId: null,
+    editTxType: 'expense',
+    editSelectedMajor: '食費',
+    editSelectedSub: ''
   };
 
   function loadLocalCategories() {
@@ -733,16 +822,7 @@
     const subs = currentObj ? currentObj.subs : [];
     subWrap.innerHTML = '';
 
-    const noneBtn = document.createElement('button');
-    noneBtn.type = 'button';
-    noneBtn.className = 'chip subchip' + (state.selectedSub === '' ? ' active' : '');
-    noneBtn.textContent = '指定なし';
-    noneBtn.onclick = () => {
-      state.selectedSub = '';
-      renderCategoryChips();
-    };
-    subWrap.appendChild(noneBtn);
-
+    // 小カテゴリを先に並べ、「指定なし」を一番右に配置
     subs.forEach(sub => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -754,6 +834,177 @@
       };
       subWrap.appendChild(btn);
     });
+
+    const noneBtn = document.createElement('button');
+    noneBtn.type = 'button';
+    noneBtn.className = 'chip subchip' + (state.selectedSub === '' ? ' active' : '');
+    noneBtn.textContent = '指定なし';
+    noneBtn.onclick = () => {
+      state.selectedSub = '';
+      renderCategoryChips();
+    };
+    subWrap.appendChild(noneBtn);
+  }
+
+  // ===== 明細編集モーダル関連 =====
+  function openEditModal(id) {
+    const tx = state.transactions.find(t => t.id === id);
+    if (!tx) return;
+
+    state.editingTxId = tx.id;
+    state.editTxType = tx.type || 'expense';
+    ensureCategoryInTree(state.editTxType, tx.category, tx.subCategory);
+    state.editSelectedMajor = tx.category;
+    state.editSelectedSub = tx.subCategory || '';
+
+    document.querySelectorAll('.type-btn[data-edit-type]').forEach(b => {
+      b.classList.toggle('active', b.dataset.editType === state.editTxType);
+    });
+
+    document.getElementById('editAmount').value = tx.amount;
+    document.getElementById('editDate').value = tx.date;
+
+    const methodSel = document.getElementById('editMethod');
+    if (tx.method && !Array.from(methodSel.options).some(o => o.value === tx.method)) {
+      const opt = document.createElement('option');
+      opt.value = tx.method;
+      opt.textContent = tx.method;
+      methodSel.appendChild(opt);
+    }
+    methodSel.value = tx.method || '現金';
+    document.getElementById('editMemo').value = tx.memo || '';
+
+    renderEditCategoryChips();
+    document.getElementById('editModal').classList.add('open');
+  }
+
+  function closeEditModal() {
+    state.editingTxId = null;
+    document.getElementById('editModal').classList.remove('open');
+  }
+
+  function setEditTxType(type) {
+    state.editTxType = type;
+    document.querySelectorAll('.type-btn[data-edit-type]').forEach(b => {
+      b.classList.toggle('active', b.dataset.editType === type);
+    });
+    const list = state.categoryTree[type] || [];
+    state.editSelectedMajor = list.length > 0 ? list[0].major : '未分類';
+    state.editSelectedSub = '';
+    renderEditCategoryChips();
+  }
+
+  function renderEditCategoryChips() {
+    const majorWrap = document.getElementById('editMajorCategoryChips');
+    const subWrap = document.getElementById('editSubCategoryChips');
+    const list = state.categoryTree[state.editTxType] || [];
+
+    majorWrap.innerHTML = '';
+    list.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip' + (state.editSelectedMajor === item.major ? ' active' : '');
+      btn.textContent = item.major;
+      btn.onclick = () => {
+        state.editSelectedMajor = item.major;
+        state.editSelectedSub = '';
+        renderEditCategoryChips();
+      };
+      majorWrap.appendChild(btn);
+    });
+
+    const currentObj = list.find(c => c.major === state.editSelectedMajor);
+    const subs = currentObj ? currentObj.subs : [];
+    subWrap.innerHTML = '';
+
+    // 編集欄でも「指定なし」を一番右に配置
+    subs.forEach(sub => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip subchip' + (state.editSelectedSub === sub ? ' active' : '');
+      btn.textContent = sub;
+      btn.onclick = () => {
+        state.editSelectedSub = (state.editSelectedSub === sub) ? '' : sub;
+        renderEditCategoryChips();
+      };
+      subWrap.appendChild(btn);
+    });
+
+    const noneBtn = document.createElement('button');
+    noneBtn.type = 'button';
+    noneBtn.className = 'chip subchip' + (state.editSelectedSub === '' ? ' active' : '');
+    noneBtn.textContent = '指定なし';
+    noneBtn.onclick = () => {
+      state.editSelectedSub = '';
+      renderEditCategoryChips();
+    };
+    subWrap.appendChild(noneBtn);
+  }
+
+  async function saveEditedTransaction() {
+    if (!state.editingTxId) return;
+    const amount = Number(document.getElementById('editAmount').value);
+    const date = document.getElementById('editDate').value;
+    const method = document.getElementById('editMethod').value;
+    const memo = document.getElementById('editMemo').value.trim();
+
+    if (!amount || amount <= 0) return showToast('金額を入力してください');
+    if (!date) return showToast('日付を選択してください');
+
+    const updatedItem = {
+      id: state.editingTxId,
+      date,
+      type: state.editTxType,
+      category: state.editSelectedMajor,
+      subCategory: state.editSelectedSub,
+      amount,
+      method,
+      memo,
+      isCalc: state.editTxType === 'transfer' ? 0 : 1
+    };
+
+    const btn = document.getElementById('editSaveBtn');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    if (state.gasUrl) {
+      try {
+        const res = await fetch(state.gasUrl, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'update', item: updatedItem })
+        });
+        let ok = false;
+        try {
+          const data = await res.json();
+          ok = data && data.status === 'ok';
+        } catch (e) {}
+
+        // GAS側がupdate未対応の場合はdelete + addで確実に上書き
+        if (!ok) {
+          await fetch(state.gasUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'delete', id: updatedItem.id })
+          });
+          await fetch(state.gasUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'add', item: updatedItem })
+          });
+        }
+        await fetchData();
+        showToast('明細を修正しました');
+      } catch (e) {
+        showToast('修正の保存中にエラーが発生しました');
+      }
+    } else {
+      const idx = state.transactions.findIndex(t => t.id === updatedItem.id);
+      if (idx !== -1) state.transactions[idx] = updatedItem;
+      refreshAllViews();
+      showToast('明細を修正しました');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '変更を保存';
+    closeEditModal();
   }
 
   function setMgrType(type) {
@@ -1209,7 +1460,8 @@
 
     grouped.forEach((items, dateStr) => {
       const ym = dateStr.slice(0, 7);
-      if (prevYM && ym !== prevYM) {
+      // 最新月（先頭）も含め、月が変わるたびに区切り線を表示
+      if (ym !== prevYM) {
         html += `
           <div class="month-divider">
             <span class="month-divider-label">${formatMonthHeading(ym)}</span>
@@ -1245,7 +1497,8 @@
             </div>
             <div class="tx-right">
               <span class="tx-amount" style="color:${color}">${sign}¥${t.amount.toLocaleString()}</span>
-              <button class="del-btn" onclick="deleteTx('${t.id}')">×</button>
+              <button type="button" class="edit-btn" onclick="openEditModal('${t.id}')">編集</button>
+              <button type="button" class="del-btn" onclick="deleteTx('${t.id}')">×</button>
             </div>
           </div>
         `;
