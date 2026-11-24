@@ -245,6 +245,8 @@
       font-size: 0.85rem; z-index: 50; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
   </style>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#FDCB9E">
 </head>
 <body>
 
@@ -1437,5 +1439,14 @@
     }[s]));
   }
 </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch((err) => {
+        console.error('SW registration failed:', err);
+      });
+    });
+  }
+  </script>
 </body>
 </html>
