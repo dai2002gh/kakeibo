@@ -68,14 +68,40 @@
     @media (min-width: 700px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
     .chart-box { position: relative; height: 250px; cursor: pointer; }
 
+    .cat-group {
+      border-bottom: 1px solid #f1f5f9;
+      padding: 8px 4px;
+    }
+    .cat-group:last-child { border-bottom: none; }
     .cat-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 4px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem;
+      padding: 3px 0; font-size: 0.9rem;
       cursor: pointer; border-radius: 6px;
     }
     .cat-row:hover { background: #f8fafc; }
-    .cat-row:last-child { border-bottom: none; }
     .cat-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    .subcat-breakdown {
+      margin: 4px 0 2px 18px;
+      padding-left: 10px;
+      border-left: 2px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .subcat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--sub);
+      padding: 2px 4px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .subcat-row:hover {
+      background: #f8fafc;
+      color: var(--text);
+    }
 
     .type-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
     .type-btn {
@@ -224,7 +250,6 @@
     .del-btn { border: none; background: none; color: #cbd5e1; font-size: 1.1rem; cursor: pointer; padding: 4px; }
     .del-btn:hover { color: var(--expense); }
 
-    /* 編集モーダル */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5);
       display: none; align-items: center; justify-content: center;
@@ -823,7 +848,6 @@
     const subs = currentObj ? currentObj.subs : [];
     subWrap.innerHTML = '';
 
-    // 小カテゴリを先に並べ、「指定なし」を一番右に配置
     subs.forEach(sub => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -918,7 +942,6 @@
     const subs = currentObj ? currentObj.subs : [];
     subWrap.innerHTML = '';
 
-    // 編集欄でも「指定なし」を一番右に配置
     subs.forEach(sub => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -942,7 +965,7 @@
     subWrap.appendChild(noneBtn);
   }
 
-  async function saveEditedTransaction() {
+  function saveEditedTransaction() {
     if (!state.editingTxId) return;
     const amount = Number(document.getElementById('editAmount').value);
     const date = document.getElementById('editDate').value;
@@ -964,47 +987,41 @@
       isCalc: state.editTxType === 'transfer' ? 0 : 1
     };
 
-    const btn = document.getElementById('editSaveBtn');
-    btn.disabled = true;
-    btn.textContent = '保存中...';
+    const idx = state.transactions.findIndex(t => t.id === updatedItem.id);
+    if (idx !== -1) state.transactions[idx] = updatedItem;
+    refreshAllViews();
+    closeEditModal();
+    showToast('明細を修正しました');
 
     if (state.gasUrl) {
-      try {
-        const res = await fetch(state.gasUrl, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'update', item: updatedItem })
-        });
-        let ok = false;
+      (async () => {
         try {
-          const data = await res.json();
-          ok = data && data.status === 'ok';
-        } catch (e) {}
+          const res = await fetch(state.gasUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'update', item: updatedItem })
+          });
+          let ok = false;
+          try {
+            const data = await res.json();
+            ok = data && data.status === 'ok';
+          } catch (e) {}
 
-        if (!ok) {
-          await fetch(state.gasUrl, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'delete', id: updatedItem.id })
-          });
-          await fetch(state.gasUrl, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'add', item: updatedItem })
-          });
+          if (!ok) {
+            await fetch(state.gasUrl, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'delete', id: updatedItem.id })
+            });
+            await fetch(state.gasUrl, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'add', item: updatedItem })
+            });
+          }
+          showToast('Googleドライブにも反映しました');
+        } catch (e) {
+          showToast('ドライブ同期に失敗しました（画面上は反映済み）');
         }
-        await fetchData();
-        showToast('明細を修正しました');
-      } catch (e) {
-        showToast('修正の保存中にエラーが発生しました');
-      }
-    } else {
-      const idx = state.transactions.findIndex(t => t.id === updatedItem.id);
-      if (idx !== -1) state.transactions[idx] = updatedItem;
-      refreshAllViews();
-      showToast('明細を修正しました');
+      })();
     }
-
-    btn.disabled = false;
-    btn.textContent = '変更を保存';
-    closeEditModal();
   }
 
   function setMgrType(type) {
@@ -1182,7 +1199,8 @@
     }
   }
 
-  async function submitTransaction() {
+  // 入力後すぐに画面へ反映して次の行動に移れるようにする
+  function submitTransaction() {
     const amount = Number(document.getElementById('inAmount').value);
     const date = document.getElementById('inDate').value;
     const method = document.getElementById('inMethod').value;
@@ -1205,46 +1223,34 @@
 
     pushCategoryHistory(state.txType, state.selectedMajor, state.selectedSub);
 
-    const btn = document.getElementById('saveBtn');
-    btn.disabled = true;
-    btn.textContent = '保存中...';
-
-    if (state.gasUrl) {
-      try {
-        await fetch(state.gasUrl, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'add', item })
-        });
-        await fetchData();
-        showToast('Googleドライブに保存しました');
-      } catch (e) {
-        showToast('保存エラーが発生しました');
-      }
-    } else {
-      state.transactions.unshift(item);
-      refreshAllViews();
-      showToast('デモデータに追加しました');
-    }
+    state.transactions.unshift(item);
+    refreshAllViews();
 
     document.getElementById('inAmount').value = '';
     document.getElementById('inMemo').value = '';
-    btn.disabled = false;
-    btn.textContent = '記録する';
+    showToast('記録しました（すぐ次の入力ができます）');
+
+    if (state.gasUrl) {
+      fetch(state.gasUrl, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'add', item })
+      })
+        .then(() => showToast('Googleドライブへ送信完了'))
+        .catch(() => showToast('ドライブ送信に失敗しました'));
+    }
   }
 
-  async function deleteTx(id) {
+  function deleteTx(id) {
     if (!confirm('この明細を削除しますか？')) return;
+    state.transactions = state.transactions.filter(t => t.id !== id);
+    refreshAllViews();
+    showToast('削除しました');
+
     if (state.gasUrl) {
-      showToast('削除中...');
-      await fetch(state.gasUrl, {
+      fetch(state.gasUrl, {
         method: 'POST',
         body: JSON.stringify({ action: 'delete', id })
-      });
-      await fetchData();
-      showToast('削除しました');
-    } else {
-      state.transactions = state.transactions.filter(t => t.id !== id);
-      refreshAllViews();
+      }).catch(() => showToast('ドライブからの削除に失敗しました'));
     }
   }
 
@@ -1257,12 +1263,17 @@
     const monthTxs = state.transactions.filter(t => t.date.startsWith(state.currentYM) && t.isCalc !== 0);
     let inc = 0, exp = 0;
     const catTotals = {};
+    const subTotalsByMajor = {};
 
     monthTxs.forEach(t => {
       if (t.type === 'income') inc += t.amount;
       if (t.type === 'expense') {
         exp += t.amount;
         catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+
+        const subName = t.subCategory && String(t.subCategory).trim() ? String(t.subCategory).trim() : '指定なし';
+        if (!subTotalsByMajor[t.category]) subTotalsByMajor[t.category] = {};
+        subTotalsByMajor[t.category][subName] = (subTotalsByMajor[t.category][subName] || 0) + t.amount;
       }
     });
 
@@ -1287,14 +1298,33 @@
     sortedCats.forEach(([cat, val], idx) => {
       const color = COLORS[idx % COLORS.length];
       const share = exp > 0 ? Math.round((val / exp) * 100) : 0;
-      const row = document.createElement('div');
-      row.className = 'cat-row';
-      row.onclick = () => openMonthCategoryTransactions(cat);
-      row.innerHTML = `
-        <div><span class="cat-dot" style="background:${color}"></span>${escapeHtml(cat)} <span style="color:var(--sub); font-size:0.78rem;">(${share}%)</span></div>
-        <div style="font-weight:700;">¥${val.toLocaleString()}</div>
+      const subsMap = subTotalsByMajor[cat] || {};
+      const sortedSubs = Object.entries(subsMap).sort((a, b) => {
+        if (a[0] === '指定なし') return 1;
+        if (b[0] === '指定なし') return -1;
+        return b[1] - a[1];
+      });
+
+      const subHtml = sortedSubs.map(([subName, subVal]) => {
+        const subShare = val > 0 ? Math.round((subVal / val) * 100) : 0;
+        return `
+          <div class="subcat-row" onclick="openMonthCategoryTransactions('${escapeJs(cat)}')">
+            <span>└ ${escapeHtml(subName)} <span style="font-size:0.72rem;">(${subShare}%)</span></span>
+            <span>¥${subVal.toLocaleString()}</span>
+          </div>
+        `;
+      }).join('');
+
+      const group = document.createElement('div');
+      group.className = 'cat-group';
+      group.innerHTML = `
+        <div class="cat-row" onclick="openMonthCategoryTransactions('${escapeJs(cat)}')">
+          <div><span class="cat-dot" style="background:${color}"></span>${escapeHtml(cat)} <span style="color:var(--sub); font-size:0.78rem;">(${share}%)</span></div>
+          <div style="font-weight:700;">¥${val.toLocaleString()}</div>
+        </div>
+        ${subHtml ? `<div class="subcat-breakdown">${subHtml}</div>` : ''}
       `;
-      breakdown.appendChild(row);
+      breakdown.appendChild(group);
     });
 
     if (pieChartInstance) pieChartInstance.destroy();
@@ -1689,6 +1719,10 @@
     return String(str || '').replace(/[&<>"']/g, s => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[s]));
+  }
+
+  function escapeJs(str) {
+    return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   }
 </script>
   <script>
