@@ -104,6 +104,52 @@
       color: var(--text);
     }
 
+    .method-item {
+      padding: 10px 2px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .method-item:last-child {
+      border-bottom: none;
+      padding-bottom: 2px;
+    }
+    .method-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+    .method-name {
+      font-weight: 700;
+      color: var(--text);
+    }
+    .method-right {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .method-share {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--sub);
+      min-width: 38px;
+      text-align: right;
+    }
+    .method-bar-bg {
+      height: 8px;
+      background: var(--primary-light);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .method-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 99px;
+      transition: width 0.3s;
+    }
+
     .type-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
     .type-btn {
       padding: 10px; border: 1px solid var(--border); background: #fff;
@@ -356,6 +402,13 @@
         <div class="card-title">月別収支推移（直近6ヶ月）</div>
         <div class="chart-box"><canvas id="barChart"></canvas></div>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>支払方法・口座別支出</span>
+      </div>
+      <div id="paymentMethodBreakdown"></div>
     </div>
   </div>
 
@@ -1320,6 +1373,7 @@
     let inc = 0, exp = 0;
     const catTotals = {};
     const subTotalsByMajor = {};
+    const methodTotals = {};
 
     monthTxs.forEach(t => {
       if (t.type === 'income') inc += t.amount;
@@ -1330,6 +1384,9 @@
         const subName = t.subCategory && String(t.subCategory).trim() ? String(t.subCategory).trim() : '指定なし';
         if (!subTotalsByMajor[t.category]) subTotalsByMajor[t.category] = {};
         subTotalsByMajor[t.category][subName] = (subTotalsByMajor[t.category][subName] || 0) + t.amount;
+
+        const methodName = t.method && String(t.method).trim() ? String(t.method).trim() : '未設定';
+        methodTotals[methodName] = (methodTotals[methodName] || 0) + t.amount;
       }
     });
 
@@ -1382,6 +1439,30 @@
       `;
       breakdown.appendChild(group);
     });
+
+    const sortedMethods = Object.entries(methodTotals).sort((a, b) => b[1] - a[1]);
+    const methodWrap = document.getElementById('paymentMethodBreakdown');
+    if (sortedMethods.length === 0) {
+      methodWrap.innerHTML = '<div style="color:var(--sub); font-size:0.85rem;">支出データがありません</div>';
+    } else {
+      methodWrap.innerHTML = sortedMethods.map(([methodName, val]) => {
+        const share = exp > 0 ? Math.round((val / exp) * 100) : 0;
+        return `
+          <div class="method-item">
+            <div class="method-top">
+              <span class="method-name">${escapeHtml(methodName)}</span>
+              <div class="method-right">
+                <span>¥${val.toLocaleString()}</span>
+                <span class="method-share">${share}%</span>
+              </div>
+            </div>
+            <div class="method-bar-bg">
+              <div class="method-bar-fill" style="width:${share}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
 
     if (pieChartInstance) pieChartInstance.destroy();
     const chartLabels = sortedCats.map(c => c[0]);
