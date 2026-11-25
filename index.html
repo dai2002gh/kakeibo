@@ -592,6 +592,7 @@
 
   const MAX_CATEGORY_HISTORY = 5;
   const MONTHS_PER_PAGE = 12;
+  const CACHE_TX_KEY = 'kakeibo_tx_cache';
 
   function getTodayLocalStr() {
     const d = new Date();
@@ -654,6 +655,23 @@
     return [];
   }
 
+  function loadCachedTransactions() {
+    try {
+      const saved = localStorage.getItem(CACHE_TX_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveCachedTransactions(list) {
+    try {
+      localStorage.setItem(CACHE_TX_KEY, JSON.stringify(list));
+    } catch (e) {}
+  }
+
   let state = {
     gasUrl: localStorage.getItem('kakeibo_gas_url') || '',
     currentYM: getCurrentLocalYM(),
@@ -701,7 +719,16 @@
     updateMonthLabel();
 
     if (state.gasUrl) {
-      fetchData();
+      const cached = loadCachedTransactions();
+      if (cached && cached.length > 0) {
+        state.transactions = cached;
+        document.getElementById('syncStatus').textContent = '更新確認中...';
+        refreshAllViews();
+      } else {
+        loadDemoData();
+        refreshAllViews();
+      }
+      fetchData({ silentIfCached: Boolean(cached && cached.length > 0) });
     } else {
       loadDemoData();
       refreshAllViews();
@@ -1008,6 +1035,7 @@
 
     const idx = state.transactions.findIndex(t => t.id === updatedItem.id);
     if (idx !== -1) state.transactions[idx] = updatedItem;
+    saveCachedTransactions(state.transactions);
     refreshAllViews();
     closeEditModal();
     showToast('明細を修正しました');
@@ -1179,21 +1207,27 @@
     }
   }
 
-  async function fetchData() {
+  async function fetchData(options = {}) {
+    const silentIfCached = Boolean(options && options.silentIfCached);
     if (!state.gasUrl) {
       showToast('設定タブからGAS URLを登録してください');
       return;
     }
     const badge = document.getElementById('syncStatus');
-    badge.textContent = '同期中...';
+    badge.textContent = silentIfCached ? '更新確認中...' : '同期中...';
     try {
       const res = await fetch(state.gasUrl);
       const data = await res.json();
       if (data.status === 'ok') {
-        state.transactions = data.transactions || [];
+        const nextTxs = data.transactions || [];
+        const changed = JSON.stringify(nextTxs) !== JSON.stringify(state.transactions);
+        state.transactions = nextTxs;
+        saveCachedTransactions(nextTxs);
+
         if (data.settings) {
           if (data.settings.monthlyBudget) {
             state.monthlyBudget = Number(data.settings.monthlyBudget);
+            localStorage.setItem('kakeibo_budget', state.monthlyBudget);
             document.getElementById('budgetInput').value = state.monthlyBudget;
           }
           if (data.settings.categoriesJson) {
@@ -1207,14 +1241,16 @@
           }
         }
         badge.textContent = 'Googleドライブ同期済';
-        refreshAllViews();
+        if (!silentIfCached || changed) {
+          refreshAllViews();
+        }
       } else {
         badge.textContent = '同期エラー';
-        showToast('取得失敗: ' + data.message);
+        if (!silentIfCached) showToast('取得失敗: ' + data.message);
       }
     } catch (e) {
       badge.textContent = '通信エラー';
-      showToast('GASへの接続に失敗しました');
+      if (!silentIfCached) showToast('GASへの接続に失敗しました');
     }
   }
 
@@ -1242,6 +1278,7 @@
     pushCategoryHistory(state.txType, state.selectedMajor, state.selectedSub);
 
     state.transactions.unshift(item);
+    saveCachedTransactions(state.transactions);
     refreshAllViews();
 
     document.getElementById('inAmount').value = '';
@@ -1261,6 +1298,7 @@
   function deleteTx(id) {
     if (!confirm('この明細を削除しますか？')) return;
     state.transactions = state.transactions.filter(t => t.id !== id);
+    saveCachedTransactions(state.transactions);
     refreshAllViews();
     showToast('削除しました');
 
